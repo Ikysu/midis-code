@@ -112,7 +112,7 @@ fastify.get("/root", async (req, reply) => {
     "https://portal.midis.info/company/personal/user/15393/disk/path/?IFRAME=Y&IFRAME_TYPE=SIDE_SLIDER",
     {
       headers: {
-        Cookie: [Cookie],
+        Cookie,
       },
       redirect: "manual",
     }
@@ -136,7 +136,19 @@ fastify.get("/root", async (req, reply) => {
   }
 });
 
-// stat
+fastify.get("/download", async (req, reply) => {
+  const { Cookie, bitrix_sessid } = checkCookie(req.cookies[cookieName]);
+  console.log(req.query.url);
+  const fileResponse = await fetch(req.query.url, {
+    headers: {
+      Cookie,
+    },
+    redirect: "manual",
+  });
+  console.log(fileResponse.blob());
+  return "OK";
+});
+
 fastify.post("/:method", async (req, reply) => {
   const { Cookie, bitrix_sessid } = checkCookie(req.cookies[cookieName]);
   let response = await fetch(
