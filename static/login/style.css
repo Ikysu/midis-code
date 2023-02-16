@@ -1,0 +1,60 @@
+/* Весь говнокод прямиком отсюда: portal.midis.info */
+/* Буду благодарен, если кто переделает и отправит мне в тг: t.me/frivols */
+
+body {
+  text-align: center;
+  display: flex;
+  background-color: #111;
+  margin: 0;
+  line-height: 1.5;
+  height: 100vh;
+}
+
+button {
+  width: 100%;
+  margin-bottom: 0.5rem;
+  padding: 0.5rem 1rem;
+  font-size: 1.25rem;
+  line-height: 1.5;
+  border-radius: 0.3rem;
+  color: #fff;
+  background-color: #007bff;
+  border: 1px solid #007bff;
+  transition: color 0.15s ease-in-out, background-color 0.15s ease-in-out,
+    border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+button:not(:disabled) {
+  cursor: pointer;
+}
+
+button:hover {
+  background-color: #0069d9;
+  border-color: #0062cc;
+}
+
+.form-signin {
+  width: 100%;
+  max-width: 330px;
+  margin: auto;
+  background-color: #fff;
+  padding: 2em 1.5em;
+  border-radius: 1em;
+}
+
+.form-control:focus {
+  border-color: #80bdff;
+  outline: 0;
+  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+.form-control {
+  box-sizing: border-box;
+  padding: 10px;
+  font-size: 16px;
+  width: 100%;
+  line-height: 1.5;
+  border: 1px solid #ced4da;
+  border-radius: 0.25rem;
+  transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}

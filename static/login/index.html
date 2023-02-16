@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Авторизация</title>
+    <link rel="stylesheet" href="/login/style.css" />
+    <link rel="stylesheet" href="/login/loader.css" />
+  </head>
+  <body>
+    <div id="loader" class="loader blackout blackin">
+      <div class="lds-facebook">
+        <div></div>
+        <div></div>
+        <div></div>
+      </div>
+    </div>
+
+    <form class="form-signin">
+      <div>
+        <img
+          style="margin-bottom: 1.5rem"
+          src="/logo.png"
+          alt="Логотип МИДИС"
+          width="300"
+          height="60"
+        />
+        <div style="margin-bottom: 0.5rem">
+          <input
+            class="form-control"
+            type="text"
+            placeholder="Логин"
+            required
+            autofocus
+          />
+        </div>
+        <div style="margin-bottom: 0.5rem">
+          <input
+            class="form-control"
+            type="password"
+            placeholder="Пароль"
+            required
+          />
+        </div>
+      </div>
+      <button type="submit">Войти</button>
+    </form>
+    <script>
+      const endpoint = "https://k.iky.su",
+        loader = document.getElementById("loader"),
+        form = document.getElementsByTagName("form")[0];
+      form.onsubmit = async (e) => {
+        e.preventDefault();
+        loaderOn();
+        let [l, p] = [...document.getElementsByTagName("input")].map(
+          ({ value }) => value
+        );
+        if (l.length == 6 && p.length == 6) {
+          const authResponse = await fetch(`${endpoint}/auth?l=${l}&p=${p}`);
+          const authData = await authResponse.json();
+          if (authResponse.ok) {
+            window.location.replace("/");
+          } else {
+            alert(`${authData.message}`);
+          }
+        } else {
+          alert("Incorrect login or password.");
+        }
+        loaderOff();
+      };
+
+      function loaderOff() {
+        loader.classList.remove("blackin");
+        setTimeout(() => {
+          loader.style.display = "none";
+        }, 300);
+      }
+
+      function loaderOn() {
+        loader.style.display = "flex";
+        setTimeout(() => {
+          loader.classList.add("blackin");
+        }, 100);
+      }
+
+      window.onload = () => {
+        loader.classList.remove("blackin");
+        setTimeout(() => {
+          loader.style.display = "none";
+        }, 300);
+      };
+    </script>
+  </body>
+</html>

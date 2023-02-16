@@ -1,0 +1,31 @@
+{
+  "productConfiguration": {
+    "nameShort": "MidisCode",
+    "nameLong": "VSCode Web for Midis by Ikysu",
+    "applicationName": "vscode-midis",
+    "dataFolderName": ".vscode-midis",
+    "version": "1.75.0",
+    "extensionsGallery": {
+      "serviceUrl": "https://open-vsx.org/vscode/gallery",
+      "itemUrl": "https://open-vsx.org/vscode/item",
+      "resourceUrlTemplate": "https://openvsxorg.blob.core.windows.net/resources/{publisher}/{name}/{version}/{path}"
+    },
+    "extensionEnabledApiProposals": {
+      "vscode.vscode-web-playground": [
+        "fileSearchProvider",
+        "textSearchProvider"
+      ]
+    }
+  },
+  "folderUri": {
+    "scheme": "midisfs",
+    "path": "/"
+  },
+  "additionalBuiltinExtensions": [
+    {
+      "scheme": "https",
+      "path": "midis-drive"
+    }
+  ]
+}
+
