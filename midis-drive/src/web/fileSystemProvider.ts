@@ -81,7 +81,7 @@ export class MidisFS implements vscode.FileSystemProvider {
 
 	async stat(uri: vscode.Uri): Promise<vscode.FileStat> {
 		console.log(`Stat: ${uri.path}`);
-		const { type, ctime, mtime } = await this._uriToElement(uri);
+		const { type, ctime, mtime } = await this._uriToElement(uri.path);
 		return {
 			type: this._formatType(type),
 			ctime,
@@ -89,26 +89,31 @@ export class MidisFS implements vscode.FileSystemProvider {
 			size: 0
 		};
 	}
+	
 	async readDirectory(uri: vscode.Uri): Promise<[string, vscode.FileType][]> {
 		console.log(`ReadDIR: ${uri.path}`);
-		return (await this._getFilesInFolder((await this._uriToElement(uri)).id)).map(element => [element.name, this._formatType(element.type)]);
+		return (await this._getFilesInFolder((await this._uriToElement(uri.path)).id)).map(element => [element.name, this._formatType(element.type)]);
 	}
+
 	async createDirectory(uri: vscode.Uri): Promise<void> {
 		console.log(`CreateDIR: ${uri.path}`);
-		await this._uriToElement(uri, true, false);
+		await this._uriToElement(uri.path, true, false);
 	}
+
 	async readFile(uri: vscode.Uri): Promise<Uint8Array> {
 		console.log(`ReadFILE: ${uri.path}`);
-		return await download((await this._uriToElement(uri)).id);
+		return await download((await this._uriToElement(uri.path)).id);
 	}
+
 	async writeFile(uri: vscode.Uri, content: Uint8Array, options: { readonly create: boolean; readonly overwrite: boolean; }): Promise<void> {
-		const element = await this._uriToElement(uri, options.create);
+		const element = await this._uriToElement(uri.path, options.create);
 		const data = [element.name, btoa(this._decoder.decode(content))];
 		await this._writeFile(element.parent, data);
 	}
+
 	async delete(uri: vscode.Uri, options: { readonly recursive: boolean; }): Promise<void> {
 		console.log(`Delete: ${uri.path}`);
-		const element = await this._uriToElement(uri);
+		const element = await this._uriToElement(uri.path);
 		switch(element.type){
 			case "file":
 				await this._deleteFile(element.id, uri);
@@ -120,38 +125,45 @@ export class MidisFS implements vscode.FileSystemProvider {
 				throw vscode.FileSystemError.FileNotFound(uri);
 		}
 	}
+
 	async rename(oldUri: vscode.Uri, newUri: vscode.Uri, options: { readonly overwrite: boolean; }): Promise<void> {
 		console.log(`Rename: ${oldUri.path}`);
 		if(options.overwrite) {
 			await this.delete(newUri, {recursive: true});
 		}
-		const renameTo = await this._uriToElement(newUri);
-		const element = await this._uriToElement(oldUri);
-		const newName: string = newUri.path.split("/").at(-1) ?? `${element.name} copy ${this._simpleName()}`;
-		switch(element.type){
-			case "file":
-				await this._renameFile(element.id, newName, oldUri);
-				break;
-			case "folder":
-				await this._renameFolder(element.id, newName, oldUri);
-				break;
-			default:
-				throw vscode.FileSystemError.FileNotFound(oldUri);
+
+		if(oldUri.path.split("/").slice(0,-1).join("/") === newUri.path.split("/").slice(0,-1).join("/")) {
+			const element = await this._uriToElement(oldUri.path);
+			const parent = await this._uriToElement(newUri.path.split("/").slice(0,-1).join("/"), true);
+			const newName: string = newUri.path.split("/").at(-1) ?? `${element.name} copy ${this._simpleName()}`;
+			switch(element.type){
+				case "file":
+					await this._renameFile(element.id, newName, oldUri);
+					break;
+				case "folder":
+					await this._renameFolder(element.id, newName, oldUri);
+					break;
+				default:
+					throw vscode.FileSystemError.FileNotFound(oldUri);
+			}
+			delete this._bigdata[element.parent].children[element.id];
+			this._bigdata[parent.parent].children[element.id]={
+				type:element.type,
+				name:element.name,
+				id:element.id
+			};
+		}else{
+			throw new Error('Увы, но пока что функция недоступна (moveto)');
 		}
-		delete this._bigdata[element.parent].children[element.id];
-		this._bigdata[renameTo.id].children[element.id]={
-			type:element.type,
-			name:element.name,
-			id:element.id
-		};
 	}
+
 	copy?(source: vscode.Uri, destination: vscode.Uri, options: { readonly overwrite: boolean; }): void | Thenable<void> {
 		console.log(`Copy: ${source.path}`);
 		throw new Error('Увы, но пока что функция недоступна'); // disk.folder.copyto || disk.file.copyto
 	}
 
-	async _uriToElement(uri: vscode.Uri, creator: boolean = false, isFile: boolean = true): Promise<Element> {
-		let path = uri.path.split("/").filter(e => e !== "");
+	async _uriToElement(uri: string, creator: boolean = false, isFile: boolean = true): Promise<Element> {
+		let path = uri.split("/").filter(e => e !== "");
 		if (path.length) {
 			let pre: Element = this._bigdata[this._root];
 			for (let index = 0; index < path.length; index++) {
