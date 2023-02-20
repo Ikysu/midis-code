@@ -15,7 +15,7 @@ export async function request(url: string, body: any = {}) {
 }
 
 export async function download(id: number) {
-	const res = await fetch(`/dl/${id}/?filename`);
+	const res = await fetch(`/download?id=${id}`); // `/dl/${id}/?filename`
 	const data = await res.arrayBuffer();
 	return new Uint8Array(data);
 }
@@ -31,7 +31,7 @@ export async function activate(context: vscode.ExtensionContext) {
 			const midisFs = new MidisFS(rootData.rootId, rootFolderData.result);
 			context.subscriptions.push(vscode.workspace.registerFileSystemProvider('midisfs', midisFs, { isCaseSensitive: true }));
 
-			vscode.window.showInformationMessage("Connected");
+			vscode.window.showInformationMessage("Connection established");
 		}else{
 			vscode.window.showInformationMessage(rootFolderData.message);
 		}

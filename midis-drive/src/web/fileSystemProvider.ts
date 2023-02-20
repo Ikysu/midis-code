@@ -6,147 +6,17 @@
 
 import * as vscode from 'vscode';
 import { download, request } from './extension';
-
-// export class File implements vscode.FileStat {
-
-// 	type: vscode.FileType;
-// 	ctime: number;
-// 	mtime: number;
-// 	size: number;
-
-// 	name: string;
-// 	data?: Uint8Array;
-
-// 	constructor(name: string) {
-// 		this.type = vscode.FileType.File;
-// 		this.ctime = Date.now();
-// 		this.mtime = Date.now();
-// 		this.size = 0;
-// 		this.name = name;
-// 	}
-// }
-
-// export class Directory implements vscode.FileStat {
-
-// 	type: vscode.FileType;
-// 	ctime: number;
-// 	mtime: number;
-// 	size: number;
-
-// 	name: string;
-// 	entries: Map<string, File | Directory>;
-
-// 	constructor(name: string, entries) {
-// 		this.type = vscode.FileType.Directory;
-// 		this.ctime = Date.now();
-// 		this.mtime = Date.now();
-// 		this.size = 0;
-// 		this.name = name;
-// 		this.entries = new Map();
-// 	}
-// }
-
-// export type Entry = File | Directory;
-
-// export class MidisFS implements vscode.FileSystemProvider {
-
-//     root = new Directory('');
-
-//     constructor(name: string) {
-//         this.root = new Directory(name);
-//     }
-
-
-// 	// --- manage file metadata
-
-// 	stat(uri: vscode.Uri): vscode.FileStat {
-//         vscode.window.showInformationMessage("Stat: "+uri);
-// 		return {
-//             type: 1,
-//             ctime: 0,
-//             mtime: 0,
-//             size: 0
-//         };
-// 	}
-
-// 	async readDirectory(uri: vscode.Uri): Promise<[string, vscode.FileType][]> {
-// 		const result: [string, vscode.FileType][] = [];
-// 		//const {res: folderRes, data: folderData} = await request("/disk.folder.get", {id: rootData.rootId});
-//         if(true){
-
-//             vscode.window.showInformationMessage("Read dir: "+uri.fsPath);
-//             return result;
-//         }else{
-//             throw vscode.FileSystemError.FileNotFound();
-//         }
-// 	}
-
-// 	// --- manage file contents
-
-// 	readFile(uri: vscode.Uri): Uint8Array {
-// 		throw vscode.FileSystemError.FileNotFound();
-// 	}
-
-// 	writeFile(uri: vscode.Uri, content: Uint8Array, options: { create: boolean, overwrite: boolean }): void {
-
-// 	}
-
-// 	// --- manage files/folders
-
-// 	rename(oldUri: vscode.Uri, newUri: vscode.Uri, options: { overwrite: boolean }): void {
-
-// 	}
-
-// 	delete(uri: vscode.Uri): void {
-
-// 	}
-
-// 	createDirectory(uri: vscode.Uri): void {
-// 		vscode.window.showInformationMessage("Create dir: "+this.root.name);
-// 	}
-
-
-
-
-
-// 	// --- manage file events
-
-// 	private _emitter = new vscode.EventEmitter<vscode.FileChangeEvent[]>();
-// 	private _bufferedEvents: vscode.FileChangeEvent[] = [];
-// 	private _fireSoonHandle?: NodeJS.Timer;
-
-// 	readonly onDidChangeFile: vscode.Event<vscode.FileChangeEvent[]> = this._emitter.event;
-
-// 	watch(_resource: vscode.Uri): vscode.Disposable {
-// 		// ignore, fires for all changes...
-// 		return new vscode.Disposable(() => { });
-// 	}
-
-// 	private _fireSoon(...events: vscode.FileChangeEvent[]): void {
-// 		this._bufferedEvents.push(...events);
-
-// 		if (this._fireSoonHandle) {
-// 			clearTimeout(this._fireSoonHandle);
-// 		}
-
-// 		this._fireSoonHandle = setTimeout(() => {
-// 			this._emitter.fire(this._bufferedEvents);
-// 			this._bufferedEvents.length = 0;
-// 		}, 5);
-// 	}
-// }
-
-
 export type Element = {
 	id: number;
 	name: string;
 	type: "file" | "folder" | "unknown";
 	ctime: number;
 	mtime: number;
-	children?: Record<string, {
+	children: Record<string, {
 		type: "file" | "folder" | "unknown",
 		name: string
 	}>;
+	parent: number;
 };
 
 export class MidisFS implements vscode.FileSystemProvider {
@@ -155,6 +25,7 @@ export class MidisFS implements vscode.FileSystemProvider {
 
 	_root: number = 0;
 	_bigdata: Record<string, Element> = {};
+	_decoder: TextDecoder = new TextDecoder('utf8');
 
 	constructor(root: number, elements: any) {
 		this._root = root;
@@ -173,7 +44,8 @@ export class MidisFS implements vscode.FileSystemProvider {
 			type:"folder",
 			ctime:0,
 			mtime:0,
-			children
+			children,
+			parent: this._root
 		};
 	}
 
@@ -183,7 +55,9 @@ export class MidisFS implements vscode.FileSystemProvider {
 			name: data.NAME,
 			type: data.TYPE,
 			ctime: +new Date(data.CREATE_TIME),
-			mtime: +new Date(data.UPDATE_TIME)
+			mtime: +new Date(data.UPDATE_TIME),
+			children:{},
+			parent: data.PARENT_ID
 		};
 	}
 
@@ -204,6 +78,7 @@ export class MidisFS implements vscode.FileSystemProvider {
 	}
 
 	async stat(uri: vscode.Uri): Promise<vscode.FileStat> {
+		console.log(`Stat: ${uri.path}`);
 		const { type, ctime, mtime } = await this._uriToElement(uri);
 		return {
 			type: this._formatType(type),
@@ -211,35 +86,73 @@ export class MidisFS implements vscode.FileSystemProvider {
 			mtime,
 			size: 0
 		};
-		throw new Error('Method not implemented. stat'); // disk.folder.get || disk.file.get
 	}
 	async readDirectory(uri: vscode.Uri): Promise<[string, vscode.FileType][]> {
+		console.log(`ReadDIR: ${uri.path}`);
 		return (await this._getFilesInFolder((await this._uriToElement(uri)).id)).map(element => [element.name, this._formatType(element.type)]);
 	}
-	createDirectory(uri: vscode.Uri): void | Thenable<void> {
-		throw new Error('Method not implemented. createDirectory'); // disk.folder.addsubfolder
+	async createDirectory(uri: vscode.Uri): Promise<void> {
+		console.log(`CreateDIR: ${uri.path}`);
+		await this._uriToElement(uri, true, false);
 	}
 	async readFile(uri: vscode.Uri): Promise<Uint8Array> {
+		console.log(`ReadFILE: ${uri.path}`);
 		return await download((await this._uriToElement(uri)).id);
 	}
-	writeFile(uri: vscode.Uri, content: Uint8Array, options: { readonly create: boolean; readonly overwrite: boolean; }): void | Thenable<void> {
-		throw new Error('Method not implemented. writeFile');  // disk.folder.uploadfile
+	async writeFile(uri: vscode.Uri, content: Uint8Array, options: { readonly create: boolean; readonly overwrite: boolean; }): Promise<void> {
+		const element = await this._uriToElement(uri, options.create);
+		const data = [element.name, btoa(this._decoder.decode(content))];
+		if(await this._writeFile(element.id, data)) { throw vscode.FileSystemError.FileNotFound(); }
 	}
-	delete(uri: vscode.Uri, options: { readonly recursive: boolean; }): void | Thenable<void> {
-		throw new Error('Method not implemented. delete'); // disk.folder.deletetree || disk.file.delete
+	async delete(uri: vscode.Uri, options: { readonly recursive: boolean; }): Promise<void> {
+		console.log(`Delete: ${uri.path}`);
+		const element = await this._uriToElement(uri);
+		switch(element.type){
+			case "file":
+				if(!(await this._deleteFile(element.id))) { throw vscode.FileSystemError.FileIsADirectory(uri); }
+				break;
+			case "folder":
+				if(!(await this._deleteFolder(element.id))) { throw vscode.FileSystemError.FileNotADirectory(uri); }
+				break;
+			default:
+				throw vscode.FileSystemError.FileNotFound(uri);
+		}
 	}
-	rename(oldUri: vscode.Uri, newUri: vscode.Uri, options: { readonly overwrite: boolean; }): void | Thenable<void> {
-		throw new Error('Method not implemented. rename'); // disk.folder.rename || disk.file.rename
+	async rename(oldUri: vscode.Uri, newUri: vscode.Uri, options: { readonly overwrite: boolean; }): Promise<void> {
+		console.log(`Rename: ${oldUri.path}`);
+		if(options.overwrite) {
+			await this.delete(newUri, {recursive: true});
+		}
+		const renameTo = await this._uriToElement(newUri);
+		const element = await this._uriToElement(oldUri);
+		const newName: string = newUri.path.split("/").at(-1) ?? `${element.name} copy ${this._simpleName()}`;
+		switch(element.type){
+			case "file":
+				if(!(await this._renameFile(element.id, newName))) { throw vscode.FileSystemError.FileIsADirectory(oldUri); }
+				break;
+			case "folder":
+				if(!(await this._renameFolder(element.id, newName))) { throw vscode.FileSystemError.FileNotADirectory(oldUri); }
+				break;
+			default:
+				throw vscode.FileSystemError.FileNotFound(oldUri);
+		}
+		delete this._bigdata[element.parent].children[element.id];
+		this._bigdata[renameTo.id].children[element.id]={
+			type:element.type,
+			name:element.name
+		};
 	}
 	copy?(source: vscode.Uri, destination: vscode.Uri, options: { readonly overwrite: boolean; }): void | Thenable<void> {
-		throw new Error('Method not implemented. copy'); // disk.folder.copyto || disk.file.copyto
+		console.log(`Copy: ${source.path}`);
+		throw new Error('Увы, но пока что функция недоступна'); // disk.folder.copyto || disk.file.copyto
 	}
 
-	async _uriToElement(uri: vscode.Uri): Promise<Element> {
+	async _uriToElement(uri: vscode.Uri, creator: boolean = false, isFile: boolean = true): Promise<Element> {
 		let path = uri.path.split("/").filter(e => e !== "");
 		if (path.length) {
 			let pre: Element = this._bigdata[this._root];
 			for (let index = 0; index < path.length; index++) {
+				if(!this._bigdata[pre.id]) { this._bigdata[pre.id]=pre; }
 				const folder = await this._getFilesInFolder( pre.id );
 				const find = folder.find(({name})=>{
 					return name===path[index];
@@ -254,16 +167,87 @@ export class MidisFS implements vscode.FileSystemProvider {
 							break;
 					
 						default:
-							throw new Error("Path not found");
+							throw vscode.FileSystemError.FileNotFound(uri);
 					}
 				}else{
-					throw new Error("Path not found");
+					if(creator) {
+						if(isFile) {
+							pre=await this._writeFile(pre.id, [path[index], "dGV4dA=="]);
+						}else{
+							pre=await this._createFolder(pre.id, path[index]);
+						}
+					}else{
+						throw vscode.FileSystemError.FileNotFound(uri);
+					}
 				}
 			}
 			return pre;
 		} else {
 			let rootFolder = this._checkIfInBigData(this._root) ?? this._getFolder(this._root);
 			return rootFolder;
+		}
+	}
+
+	// ================================
+
+	async _renameFolder(id: number, newName: string): Promise<boolean> {
+		const folder = this._checkIfInBigData(id);
+		const { res: renameFolderRes, data: renameFolderData } = await request("/disk.folder.rename", { id, newName });
+		if (renameFolderRes.ok) {
+			const out = this._formatElement(renameFolderData.result);
+			this._bigdata[id].name=out.name;
+			this._bigdata[folder.parent].children[id].name=out.name;
+			return true;
+		} else {
+			return false;
+		}
+	}
+
+	async _recursiveDelete(dirId: number) {
+		let out: number[] = [];
+		for(const childId of (await this._getFilesInFolder(dirId)).map(e=>e.id)) {
+			out.concat(await this._recursiveDelete(childId));
+			out.push(childId);
+		}
+		return out;
+	}
+
+	async _deleteFolder(id: number): Promise<boolean> {
+		const folder = this._checkIfInBigData(id);
+		for(const childId of await this._recursiveDelete(folder.id)) {
+			delete this._bigdata[childId];
+		}
+		const { res: deleteFolderRes, data: deleteFolderData } = await request("/disk.folder.deletetree", { id });
+		if (deleteFolderRes.ok) {
+			if(deleteFolderData.result) { delete this._bigdata[id]; }
+			return deleteFolderData.result;
+		} else {
+			return false;
+		}
+	}
+
+	async _createFolder(id: number, name: string): Promise<Element> {
+		if(this._checkIfInBigData(id)){
+			if(!Object.values(this._bigdata[id].children).map(e=>e.name).includes(name)){
+				// eslint-disable-next-line @typescript-eslint/naming-convention
+				const { res: createFolderRes, data: createFolderData } = await request("/disk.folder.addsubfolder", { id, "data[NAME]": name });
+				if (createFolderRes.ok) {
+					const out = this._formatElement(createFolderData.result);
+					this._bigdata[id].children[out.id]=out;
+					return out;
+				} else {
+					let err = `Error get folder: ${createFolderRes.status}`;
+					try {
+						let j = await createFolderRes.json();
+						err=j.error_description ?? j.message;
+					} catch (error) {}
+					throw new Error(err);
+				}
+			}else{
+				throw vscode.FileSystemError.FileExists();
+			}
+		}else{
+			throw vscode.FileSystemError.FileNotFound();
 		}
 	}
 
@@ -279,6 +263,48 @@ export class MidisFS implements vscode.FileSystemProvider {
 		}
 		this._bigdata[folder.id]=folder;
 		return folder;
+	}
+
+	// ================================
+
+	async _writeFile(id: number, data: any): Promise<Element> {
+		const [name, content]: [name: string, content: string] = data;
+		const file = this._checkIfInBigData(id);
+		// eslint-disable-next-line @typescript-eslint/naming-convention
+		const { res: writeFileRes, data: writeFileData } = await request("/disk.folder.uploadfile", { id, "fileContent[0]": name, "fileContent[1]":content, "data[NAME]": name });
+		if (writeFileRes.ok) {
+			const out = this._formatElement(writeFileData.result);
+			this._bigdata[id].name=out.name;
+			this._bigdata[file.parent].children[id].name=out.name;
+			return out;
+		} else {
+			throw vscode.FileSystemError.FileNotFound();
+		}
+	}
+
+	async _renameFile(id: number, newName: string): Promise<boolean> {
+		const file = this._checkIfInBigData(id);
+		const { res: renameFileRes, data: renameFileData } = await request("/disk.file.rename", { id, newName });
+		if (renameFileRes.ok) {
+			const out = this._formatElement(renameFileData.result);
+			this._bigdata[id].name=out.name;
+			this._bigdata[file.parent].children[id].name=out.name;
+			return true;
+		} else {
+			return false;
+		}
+	}
+
+	async _deleteFile(id: number): Promise<boolean> {
+		const file = this._checkIfInBigData(id);
+		delete this._bigdata[file.parent].children[file.id];
+		const { res: deleteFileRes, data: deleteFileData } = await request("/disk.file.delete", { id });
+		if (deleteFileRes.ok) {
+			if(deleteFileData.result) { delete this._bigdata[id]; }
+			return deleteFileData.result;
+		} else {
+			return false;
+		}
 	}
 
 	async _getFile(id: number): Promise<Element> {
@@ -298,24 +324,26 @@ export class MidisFS implements vscode.FileSystemProvider {
 	async _getFilesInFolder(id: number): Promise<Element[]> {
 		let folder = await this._getFolder(id);
 		if(folder.children&&Object.keys(folder.children).length){
-			return Promise.all(Object.keys(folder.children).map(async (id: string)=>{
-				if(this._bigdata[id]){
-					return this._bigdata[id];
+			return Promise.all(Object.keys(folder.children).map(async (childId: string)=>{
+				if(this._bigdata[childId]){
+					return this._bigdata[childId];
 				}else{
 					if(!folder.children){folder.children={};}
-					let type = folder.children[id]?.type;
+					let type = folder.children[childId]?.type;
 					switch (type) {
 						case "folder":
-							return await this._getFolder(+id);
+							return await this._getFolder(+childId);
 						case "file":
-							return await this._getFile(+id);
+							return await this._getFile(+childId);
 						default:
 							return {
 								id:-1,
 								name: "Error",
 								type: "unknown",
 								ctime:0,
-								mtime:0
+								mtime:0,
+								children:{},
+								parent:folder.id
 							};
 					}
 				}
@@ -340,8 +368,9 @@ export class MidisFS implements vscode.FileSystemProvider {
 				throw new Error(`Error get files list: ${rootFolderRes.status}`);
 			}
 		}
-		
 	}
+
+	// ================================
 
 	_checkIfInBigData(id: number) {
 		return this._bigdata[id];
@@ -349,5 +378,10 @@ export class MidisFS implements vscode.FileSystemProvider {
 
 	_thisIsFileOrFolder(uri: vscode.Uri): "file" | "folder" {
 		return "file";
+	}
+
+	_simpleName() {
+		let chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz01234567";
+		return new Date().toLocaleTimeString().split(":").map(e=>chars[+e]).join("");
 	}
 }

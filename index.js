@@ -27,8 +27,9 @@ fastify.register(fastifySensible);
 fastify.register(fastifyStatic, {
   root: path.join(__dirname, "midis-drive"),
   prefix: "/midis-drive",
-  index: false,
-  list: true,
+  index:false,
+  list:true,
+  allowedPath:(pathName, root, req)=>pathName.indexOf("src")==-1
 });
 
 fastify.register(fastifyStatic, {
@@ -43,18 +44,18 @@ fastify.register(fastifyStatic, {
   decorateReply: false,
 });
 
-fastify.register(fastifyHttpProxy, {
-  upstream: 'https://portal.midis.info',
-  prefix:"/dl",
-  rewritePrefix:"/disk/downloadFile",
-  replyOptions: {
-    rewriteRequestHeaders: (req, headers) => {
-      let cok = decodeURIComponent(req.headers.cookie.match(new RegExp(`${cookieName}\=.+?;`, "gm"))?.[0]?.slice(12, -1));
-      const { Cookie, bitrix_sessid } = checkCookie(cok);
-      return {cookie:Cookie}
-    }
-  }
-})
+// fastify.register(fastifyHttpProxy, {
+//   upstream: 'https://portal.midis.info',
+//   prefix:"/dl",
+//   rewritePrefix:"/disk/downloadFile",
+//   replyOptions: {
+//     rewriteRequestHeaders: (req, headers) => {
+//       let cok = decodeURIComponent(req.headers.cookie.match(new RegExp(`${cookieName}\=.+?;`, "gm"))?.[0]?.slice(12, -1));
+//       const { Cookie, bitrix_sessid } = checkCookie(cok);
+//       return {cookie:Cookie}
+//     }
+//   }
+// })
 
 fastify.get("/auth", async (req, reply) => {
   const authResponse = await fetch(
@@ -117,7 +118,6 @@ function checkCookie(cookie) {
 fastify.get("/cookie", async (req, reply) => {
   console.log(req.headers['x-forwarded-for'])
   const { Cookie, bitrix_sessid } = checkCookie(req.cookies[cookieName]);
-  console.log(req.cookies[cookieName])
   const checkResponse = await fetch(
     "https://portal.midis.info/company/personal/user/15393/disk/path/?IFRAME=Y&IFRAME_TYPE=SIDE_SLIDER",
     {
@@ -127,8 +127,21 @@ fastify.get("/cookie", async (req, reply) => {
       redirect: "manual",
     }
   );
-  reply.status(checkResponse.ok ? 200 : 400);
-  return {};
+  if (checkResponse.ok) {
+    const body = await checkResponse.text();
+    const rootId = body
+      .match(/rootObject.+\n.+?id:\s+?[0-9]+?\,/gm)?.[0]
+      ?.split(",")?.[0]
+      ?.split(" ")
+      ?.at(-1);
+    if (rootId) {
+      reply.send({ok:true});
+    } else {
+      throw fastify.httpErrors.internalServerError("Куки устарели");
+    }
+  } else {
+    throw fastify.httpErrors.internalServerError("Портал не отвечает");
+  }
 });
 
 fastify.post("/root", async (req, reply) => {
