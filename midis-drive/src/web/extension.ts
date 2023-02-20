@@ -4,10 +4,20 @@ import { MidisFS } from './fileSystemProvider';
 export async function request(url: string, body: any = {}) {
 	const res = await fetch(url, {
 		method:"post",
-		body
+		headers:{
+			// eslint-disable-next-line @typescript-eslint/naming-convention
+			"Content-Type":"application/json"
+		},
+		body:JSON.stringify(body)
 	});
 	const data = await res.json();
 	return {res, data};
+}
+
+export async function download(id: number) {
+	const res = await fetch(`/dl/${id}/?filename`);
+	const data = await res.arrayBuffer();
+	return new Uint8Array(data);
 }
 
 export async function activate(context: vscode.ExtensionContext) {
@@ -23,10 +33,10 @@ export async function activate(context: vscode.ExtensionContext) {
 
 			vscode.window.showInformationMessage("Connected");
 		}else{
-			vscode.window.showErrorMessage(rootFolderData.message);
+			vscode.window.showInformationMessage(rootFolderData.message);
 		}
 	}else{
-		vscode.window.showErrorMessage(rootData.message);
+		vscode.window.showInformationMessage(rootData.message);
 	}
 }
 

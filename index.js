@@ -3,6 +3,7 @@ import fastifyCors from "@fastify/cors";
 import fastifySensible from "@fastify/sensible";
 import fastifyStatic from "@fastify/static";
 import fastifyCookie from "@fastify/cookie";
+import fastifyHttpProxy from "@fastify/http-proxy";
 import path from "path";
 import * as url from "url";
 
@@ -41,6 +42,19 @@ fastify.register(fastifyStatic, {
   prefix: "/",
   decorateReply: false,
 });
+
+fastify.register(fastifyHttpProxy, {
+  upstream: 'https://portal.midis.info',
+  prefix:"/dl",
+  rewritePrefix:"/disk/downloadFile",
+  replyOptions: {
+    rewriteRequestHeaders: (req, headers) => {
+      let cok = decodeURIComponent(req.headers.cookie.match(new RegExp(`${cookieName}\=.+?;`, "gm"))?.[0]?.slice(12, -1));
+      const { Cookie, bitrix_sessid } = checkCookie(cok);
+      return {cookie:Cookie}
+    }
+  }
+})
 
 fastify.get("/auth", async (req, reply) => {
   const authResponse = await fetch(
@@ -101,11 +115,23 @@ function checkCookie(cookie) {
 }
 
 fastify.get("/cookie", async (req, reply) => {
-  checkCookie(req.cookies[cookieName]);
-  return { ok: true };
+  console.log(req.headers['x-forwarded-for'])
+  const { Cookie, bitrix_sessid } = checkCookie(req.cookies[cookieName]);
+  console.log(req.cookies[cookieName])
+  const checkResponse = await fetch(
+    "https://portal.midis.info/company/personal/user/15393/disk/path/?IFRAME=Y&IFRAME_TYPE=SIDE_SLIDER",
+    {
+      headers: {
+        Cookie,
+      },
+      redirect: "manual",
+    }
+  );
+  reply.status(checkResponse.ok ? 200 : 400);
+  return {};
 });
 
-fastify.get("/root", async (req, reply) => {
+fastify.post("/root", async (req, reply) => {
   const { Cookie, bitrix_sessid } = checkCookie(req.cookies[cookieName]);
 
   const diskResponse = await fetch(
@@ -138,15 +164,28 @@ fastify.get("/root", async (req, reply) => {
 
 fastify.get("/download", async (req, reply) => {
   const { Cookie, bitrix_sessid } = checkCookie(req.cookies[cookieName]);
-  console.log(req.query.url);
-  const fileResponse = await fetch(req.query.url, {
-    headers: {
-      Cookie,
-    },
-    redirect: "manual",
-  });
-  console.log(fileResponse.blob());
-  return "OK";
+  const fileResponse = await fetch(
+    `https://portal.midis.info/disk/downloadFile/${req.query.id}/?filename`,
+    {
+      headers: {
+        Cookie,
+      },
+      redirect: "manual",
+    }
+  );
+  if (fileResponse.ok) {
+    reply.header(
+      "content-disposition",
+      fileResponse.headers.get("content-disposition")
+    );
+    reply.type(fileResponse.headers.get("content-type"));
+    reply.send(Buffer.from(await fileResponse.arrayBuffer()));
+  } else {
+    let j = await fileResponse.json();
+    reply.status(fileResponse.status);
+    console.log(fileResponse.status, bitrix_sessid, j);
+    return j;
+  }
 });
 
 fastify.post("/:method", async (req, reply) => {
