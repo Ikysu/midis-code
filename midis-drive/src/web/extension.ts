@@ -29,7 +29,21 @@ export async function activate(context: vscode.ExtensionContext) {
 		if(rootFolderRes.ok){
 
 			const midisFs = new MidisFS(rootData.rootId, rootFolderData.result);
+			
+			const enc = new TextEncoder();
+
+			midisFs.writeFile(vscode.Uri.parse(`midisfs:/.vscode/settings.json`), enc.encode("{}"), {create: true, overwrite: false});
+			midisFs.writeFile(vscode.Uri.parse(`midisfs:/.vscode/tasks.json`), enc.encode("{}"), {create: true, overwrite: false});
+			midisFs.writeFile(vscode.Uri.parse(`midisfs:/.vscode/launch.json`), enc.encode("{}"), {create: true, overwrite: false});
+			midisFs.writeFile(vscode.Uri.parse(`midisfs:/.vscode/extensions.json`), enc.encode(JSON.stringify({
+  			"recommendations": ["beardedbear.beardedtheme", "amodio.tsl-problem-matcher", "hediet.vscode-drawio", "dbaeumer.vscode-eslint", "eamodio.gitlens", "PKief.material-icon-theme", "esbenp.prettier-vscode"]
+			})), {create: true, overwrite: false});
+			
+			
+			
 			context.subscriptions.push(vscode.workspace.registerFileSystemProvider('midisfs', midisFs, { isCaseSensitive: true }));
+
+			
 
 			vscode.window.showInformationMessage("Connection established");
 		}else{

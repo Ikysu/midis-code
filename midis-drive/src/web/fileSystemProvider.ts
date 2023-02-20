@@ -30,7 +30,7 @@ export class MidisFS implements vscode.FileSystemProvider {
 
 	constructor(root: number, elements: any) {
 		this._root = root;
-		let children: any = {}
+		let children: any = {};
 		elements.map((e: any) => {
 			let element: Element = this._formatElement(e);
 			this._bigdata[element.id] = element;
@@ -106,9 +106,8 @@ export class MidisFS implements vscode.FileSystemProvider {
 	}
 
 	async writeFile(uri: vscode.Uri, content: Uint8Array, options: { readonly create: boolean; readonly overwrite: boolean; }): Promise<void> {
-		const element = await this._uriToElement(uri.path, options.create);
-		const data = [element.name, btoa(this._decoder.decode(content))];
-		await this._writeFile(element.parent, data);
+		const body = btoa(this._decoder.decode(content));
+		const element = await this._uriToElement(uri.path, options.create, true, body, options.overwrite);
 	}
 
 	async delete(uri: vscode.Uri, options: { readonly recursive: boolean; }): Promise<void> {
@@ -162,7 +161,7 @@ export class MidisFS implements vscode.FileSystemProvider {
 		throw new Error('Увы, но пока что функция недоступна'); // disk.folder.copyto || disk.file.copyto
 	}
 
-	async _uriToElement(uri: string, creator: boolean = false, isFile: boolean = true): Promise<Element> {
+	async _uriToElement(uri: string, creator: boolean = false, isFile: boolean = true, fileData: string = "", overwrite: boolean = false): Promise<Element> {
 		let path = uri.split("/").filter(e => e !== "");
 		if (path.length) {
 			let pre: Element = this._bigdata[this._root];
@@ -186,11 +185,16 @@ export class MidisFS implements vscode.FileSystemProvider {
 					}
 				}else{
 					if(creator) {
-						if(isFile) {
-							pre=await this._writeFile(pre.id, [path[index], ""]);
-						}else{
+						if(index < path.length-1) {
 							pre=await this._createFolder(pre.id, path[index]);
+						}else{
+							if(isFile) {
+								pre=await this._writeFile(pre.id, [path[index], fileData], overwrite);
+							}else{
+								pre=await this._createFolder(pre.id, path[index]);
+							}
 						}
+						
 					}else{
 						throw vscode.FileSystemError.FileNotFound(uri);
 					}
@@ -248,6 +252,7 @@ export class MidisFS implements vscode.FileSystemProvider {
 				const { res: createFolderRes, data: createFolderData } = await request("/disk.folder.addsubfolder", { id, "data[NAME]": name });
 				if (createFolderRes.ok) {
 					const out = this._formatElement(createFolderData.result);
+					this._bigdata[out.id]=out;
 					this._bigdata[id].children[out.id]=out;
 					return out;
 				} else {
@@ -282,28 +287,34 @@ export class MidisFS implements vscode.FileSystemProvider {
 
 	// ================================
 
-	async _writeFile(id: number, data: any): Promise<Element> {
+	async _writeFile(id: number, data: any, overwrite: boolean): Promise<Element> {
 		let [name, content]: [name: string, content: string] = data;
 		if(content==="") {content="Cg==";} 
 		
 		const folder = await this._getFolder(id);
 		const find = Object.values(folder.children).find((e)=>e.name===name);
 
-		//eslint-disable-next-line @typescript-eslint/naming-convention
-		const { res: writeFileRes, data: writeFileData } = await request(find?"/disk.file.uploadversion":"/disk.folder.uploadfile", find ? { id:find.id, "fileContent[0]": name, "fileContent[1]":content} : { id, "fileContent[0]": name, "fileContent[1]":content, "data[NAME]": name });
-		
-		if (writeFileRes.ok) {
-			const out = this._formatElement(writeFileData.result);
-			this._bigdata[out.id]=out;
-			this._bigdata[out.parent].children[out.id]={
-				type:out.type,
-				name:out.name,
-				id:out.id
-			};
-			return out;
-		} else {
-			throw vscode.FileSystemError.FileNotFound();
+		if(find && !overwrite) {
+			return this._bigdata[find.id];
+		}else{
+			//eslint-disable-next-line @typescript-eslint/naming-convention
+			const { res: writeFileRes, data: writeFileData } = await request(find?"/disk.file.uploadversion":"/disk.folder.uploadfile", find ? { id:find.id, "fileContent[0]": name, "fileContent[1]":content} : { id, "fileContent[0]": name, "fileContent[1]":content, "data[NAME]": name });
+			
+			if (writeFileRes.ok) {
+				const out = this._formatElement(writeFileData.result);
+				this._bigdata[out.id]=out;
+				this._bigdata[out.parent].children[out.id]={
+					type:out.type,
+					name:out.name,
+					id:out.id
+				};
+				return out;
+			} else {
+				throw vscode.FileSystemError.FileNotFound();
+			}
 		}
+
+		
 		
 	}
 
