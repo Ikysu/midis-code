@@ -86,6 +86,7 @@ fastify.get("/auth", async (req, reply) => {
           {
             path: "/",
             signed: true,
+            httpOnly: true
           }
         )
         .send({
@@ -143,6 +144,16 @@ fastify.get("/cookie", async (req, reply) => {
     throw fastify.httpErrors.internalServerError("Портал не отвечает");
   }
 });
+
+fastify.get("/logout", async (req, reply)=>{
+  reply
+    .clearCookie(cookieName, {
+      path: "/",
+      signed: true,
+      httpOnly: true
+    })
+    .redirect(301, "/login");
+})
 
 fastify.post("/root", async (req, reply) => {
   const { Cookie, bitrix_sessid } = checkCookie(req.cookies[cookieName]);

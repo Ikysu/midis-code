@@ -2,6 +2,7 @@
   "name": "midis-drive",
   "displayName": "midis-drive",
   "description": "",
+  "author": "ikysu",
   "version": "0.0.1",
   "private": true,
   "engines": {

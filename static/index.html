@@ -4,7 +4,15 @@
   <head>
     <script>
       fetch("/cookie").then(($) => {
-        if (!$.ok) window.location.replace("/login");
+        if (!$.ok) window.location.replace("/logout");
+
+        const installLogout = setInterval(()=>{
+        const logout = document.getElementById("undefined.midis-drive");
+          if(logout){
+            logout.addEventListener("click", ()=>{window.location.assign("/logout")});
+            clearInterval(logout)
+          }
+        },500)
       });
     </script>
 

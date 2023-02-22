@@ -47,6 +47,12 @@
       <button type="submit">Войти</button>
     </form>
     <script>
+      localStorage.clear()
+      indexedDB.databases().then(dbs => {
+        dbs.map(db => {
+          indexedDB.deleteDatabase(db.name);
+        });
+      })
       const endpoint = "https://k.iky.su",
         loader = document.getElementById("loader"),
         form = document.getElementsByTagName("form")[0];
