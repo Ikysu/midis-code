@@ -1,9 +1,7 @@
 import Fastify from "fastify";
-import fastifyCors from "@fastify/cors";
 import fastifySensible from "@fastify/sensible";
 import fastifyStatic from "@fastify/static";
 import fastifyCookie from "@fastify/cookie";
-import fastifyHttpProxy from "@fastify/http-proxy";
 import path from "path";
 import * as url from "url";
 
@@ -11,10 +9,6 @@ const __dirname = url.fileURLToPath(new URL(".", import.meta.url));
 const cookieName = "midis_token";
 
 const fastify = Fastify();
-fastify.register(fastifyCors, {
-  methods: ["POST", "GET", "OPTIONS", "DELETE"],
-  origin: "*",
-});
 
 fastify.register(fastifyCookie, {
   secret: "cookie-secret",

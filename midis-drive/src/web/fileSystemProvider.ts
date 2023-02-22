@@ -92,7 +92,7 @@ export class MidisFS implements vscode.FileSystemProvider {
 	
 	async readDirectory(uri: vscode.Uri): Promise<[string, vscode.FileType][]> {
 		console.log(`ReadDIR: ${uri.path}`);
-		return (await this._getFilesInFolder((await this._uriToElement(uri.path)).id)).map(element => [element.name, this._formatType(element.type)]);
+		return (await this._getFilesInFolder((await this._uriToElement(uri.path)).id, true)).map(element => [element.name, this._formatType(element.type)]);
 	}
 
 	async createDirectory(uri: vscode.Uri): Promise<void> {
@@ -361,9 +361,9 @@ export class MidisFS implements vscode.FileSystemProvider {
 		return file;
 	}
 
-	async _getFilesInFolder(id: number): Promise<Element[]> {
+	async _getFilesInFolder(id: number, update: boolean = false): Promise<Element[]> {
 		let folder = await this._getFolder(id);
-		if(Object.keys(folder.children).length){
+		if(Object.keys(folder.children).length && !update ){
 			return Promise.all(Object.keys(folder.children).map(async (childId: string)=>{
 				if(this._bigdata[childId]){
 					return this._bigdata[childId];
