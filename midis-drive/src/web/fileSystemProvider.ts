@@ -162,6 +162,8 @@ export class MidisFS implements vscode.FileSystemProvider {
 		throw new Error('Увы, но пока что функция недоступна'); // disk.folder.copyto || disk.file.copyto
 	}
 
+	// ================================
+
 	async _uriToElement(uri: string, creator: boolean = false, isFile: boolean = true, fileData: string = ""): Promise<Element> {
 		let path = uri.split("/").filter(e => e !== "");
 		if (path.length) {

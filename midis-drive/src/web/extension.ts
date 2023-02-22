@@ -24,19 +24,12 @@ export async function download(id: number) {
 
 export async function activate(context: vscode.ExtensionContext) {
 
-	const cmdLogout = 'midis-disk.logout';
-	context.subscriptions.push(vscode.commands.registerCommand(cmdLogout, () => {
-		//vscode.env.openExternal(vscode.Uri.parse('https://example.com'));
-		//@ts-ignore
-		window.location.assign("/logout");
-		console.log(vscode);
-	}));
-
-	let userInfo: vscode.StatusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, Infinity);
+	let userInfo: vscode.StatusBarItem = vscode.window.createStatusBarItem("logout", vscode.StatusBarAlignment.Left, Infinity);
 	userInfo.text="Выйти";
-	userInfo.command=cmdLogout;
 	context.subscriptions.push(userInfo);
 	userInfo.show();
+	userInfo.command="midis-drive.logout";
+	userInfo.backgroundColor = new vscode.ThemeColor('statusBarItem.errorBackground');
 
 	const {res: rootRes, data: rootData} = await request("/root");
 	if(rootRes.ok){

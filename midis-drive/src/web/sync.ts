@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { CreateExtensionList, ExtensionInformation, InstallExtensions } from "./syncer/extensions";
 import { MidisFS } from './fileSystemProvider';
+import { getSettings } from './syncer/settings';
 
 export class Syncer {
 
@@ -20,7 +21,7 @@ export class Syncer {
   async init() {
     await this.fromCloud();
     const timer = setInterval(async ()=>{
-      if(this.update() && await this.toCloud()) {
+      if(await this.update() && await this.toCloud()) {
         this.toCloud().then((v)=>{
           if(v) { clearInterval(timer); }
         });
@@ -28,10 +29,12 @@ export class Syncer {
     }, 10000);
   }
 
-  update(): boolean {
+  async update(): Promise<boolean> {
+    const settings = JSON.parse(this.dec.decode(await getSettings()));
     const extensions = CreateExtensionList();
-    const isEq: boolean = this.deepCompare({extensions}, {extensions:this.extensions});
+    const isEq: boolean = this.deepCompare({extensions, settings}, {extensions:this.extensions, settings:this.settings});
     this.extensions=extensions;
+    this.settings=settings;
     return isEq;
   }
 
@@ -48,8 +51,15 @@ export class Syncer {
   fromCloud() {
     return new Promise<boolean>((resolve, _)=>{
       this.fs.readFile(this.syncJson).then(async (data)=>{
-        const {extensions} = this._formatObject(data);
+        const {extensions, settings} = this._formatObject(data);
         this.extensions=extensions;
+        this.settings=settings;
+
+        // write settings
+        Object.keys(this.settings).forEach(key=>{
+          vscode.workspace.getConfiguration().update(key, this.settings[key]);
+        });
+
         await InstallExtensions(extensions,["midis-drive"]);
         resolve(true);
       }).catch((_)=>{
@@ -59,17 +69,20 @@ export class Syncer {
   }
 
   private _formatObject(data: Uint8Array) {
-    const {extensions}: {
+    const {extensions, settings}: {
       extensions: ExtensionInformation[];
+      settings: any;
     } = JSON.parse(this.dec.decode(data));
     return {
-      extensions
+      extensions, 
+      settings
     };
   }
 
   private _formatString() {
     return this.enc.encode(JSON.stringify({
-      extensions:this.extensions
+      extensions:this.extensions,
+      settings:this.settings
     }));
   }
 
@@ -89,6 +102,7 @@ export class Syncer {
   };
 
   extensions: ExtensionInformation[] = [];
+  settings: any = {};
 
   fs: MidisFS;
 }

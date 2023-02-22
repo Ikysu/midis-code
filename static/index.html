@@ -7,7 +7,7 @@
         if (!$.ok) window.location.replace("/logout");
 
         const installLogout = setInterval(()=>{
-        const logout = document.getElementById("undefined.midis-drive");
+        const logout = document.getElementById("undefined.midis-drive.logout");
           if(logout){
             logout.addEventListener("click", ()=>{window.location.assign("/logout")});
             clearInterval(logout)

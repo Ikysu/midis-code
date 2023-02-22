@@ -1,0 +1,29 @@
+:root {
+  --vscode-textSeparator-foreground: #c62f52;
+  --vscode-inputOption-activeBorder: #c62f52;
+  --vscode-inputValidation-infoBorder: #c62f52;
+  --vscode-badge-background: #c62f52;
+  --vscode-editor-selectionForeground: #c62f52;
+  --vscode-editorCursor-background: #c62f52;
+  --vscode-peekView-border: #c62f52;
+  --vscode-tab-activeForeground: #c62f52;
+  --vscode-tab-activeBorderTop: #c62f52;
+  --vscode-panelTitle-activeForeground: #c62f52;
+  --vscode-panelTitle-activeBorder: #c62f52;
+  --vscode-panel-dropBorder: #c62f52;
+  --vscode-statusBar-noFolderBorder: #c62f52;
+  --vscode-activityBar-foreground: #c62f52;
+  --vscode-activityBar-activeBorder: #c62f52;
+  --vscode-activityBar-dropBorder: #c62f52;
+  --vscode-activityBarBadge-background: #c62f52;
+  --vscode-activityBarItem-settingsProfilesHoverForeground: #c62f52;
+  --vscode-statusBarItem-remoteBackground: #c62f52;
+  --vscode-extensionBadge-remoteBackground: #c62f52;
+  --vscode-editorCommentsWidget-unresolvedBorder: #c62f52;
+  --vscode-settings-headerForeground: #c62f52;
+  --vscode-settings-modifiedItemIndicator: #c62f52;
+  --vscode-ports-iconRunningProcessForeground: #c62f52;
+  --vscode-extensionButton-prominentHoverBackground: #c62f52;
+  --vscode-interactive-activeCodeBorder: #c62f52;
+  --vscode-gitDecoration-conflictingResourceForeground: #c62f52;
+}
