@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { CreateExtensionList, ExtensionInformation, InstallExtensions } from "./syncer/extensions";
 import { MidisFS } from './fileSystemProvider';
-import { getSettings } from './syncer/settings';
+import { getSettings, writeSettings } from './syncer/settings';
 
 export class Syncer {
 
@@ -18,12 +18,19 @@ export class Syncer {
     this.fs = fs;  
   } 
 
-  async init() {
+  async init(status: vscode.StatusBarItem) {
     await this.fromCloud();
+    status.tooltip=`Last sync: ${this.lastSync}`;
     const timer = setInterval(async ()=>{
-      if(await this.update() && await this.toCloud()) {
+      if(!await this.update()) {
+        this.lastSync=new Date().toLocaleTimeString();
         this.toCloud().then((v)=>{
-          if(v) { clearInterval(timer); }
+          if(v) {
+            status.tooltip=`Last sync: ${this.lastSync}`;
+          } else {
+            status.tooltip=`Sync error`;
+            clearInterval(timer);
+          }
         });
       }
     }, 10000);
@@ -32,7 +39,7 @@ export class Syncer {
   async update(): Promise<boolean> {
     const settings = JSON.parse(this.dec.decode(await getSettings()));
     const extensions = CreateExtensionList();
-    const isEq: boolean = this.deepCompare({extensions, settings}, {extensions:this.extensions, settings:this.settings});
+    const isEq: boolean = JSON.stringify({extensions, settings}) === JSON.stringify({extensions:this.extensions, settings:this.settings});
     this.extensions=extensions;
     this.settings=settings;
     return isEq;
@@ -51,10 +58,12 @@ export class Syncer {
   fromCloud() {
     return new Promise<boolean>((resolve, _)=>{
       this.fs.readFile(this.syncJson).then(async (data)=>{
-        const {extensions, settings} = this._formatObject(data);
+        const {extensions, settings, lastSync} = this._formatObject(data);
         this.extensions=extensions;
         this.settings=settings;
+        this.lastSync=lastSync;
 
+        writeSettings(this.enc.encode(JSON.stringify(this.settings, null, 2)));
         // write settings
         Object.keys(this.settings).forEach(key=>{
           vscode.workspace.getConfiguration().update(key, this.settings[key]);
@@ -69,38 +78,27 @@ export class Syncer {
   }
 
   private _formatObject(data: Uint8Array) {
-    const {extensions, settings}: {
+    const {extensions, settings, lastSync}: {
       extensions: ExtensionInformation[];
       settings: any;
+      lastSync: string;
     } = JSON.parse(this.dec.decode(data));
     return {
       extensions, 
-      settings
+      settings,
+      lastSync
     };
   }
 
   private _formatString() {
     return this.enc.encode(JSON.stringify({
       extensions:this.extensions,
-      settings:this.settings
+      settings:this.settings,
+      lastSync:this.lastSync
     }));
   }
 
-  private deepCompare: any = (a: any, b: any) => {
-    if (Object.prototype.toString.call(a) === Object.prototype.toString.call(b)){
-      if (Object.prototype.toString.call(a) === '[object Object]' || Object.prototype.toString.call(a) === '[object Array]' ){
-        if (Object.keys(a).length !== Object.keys(b).length ){
-          return false;
-        }
-        return (Object.keys(a).every((key: any)=>{
-          return this.deepCompare(a[key],b[key]);
-        }));
-      }
-      return (a===b);
-    }
-    return false;
-  };
-
+  lastSync: string = "";
   extensions: ExtensionInformation[] = [];
   settings: any = {};
 

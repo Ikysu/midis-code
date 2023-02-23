@@ -9,50 +9,6 @@ export class ExtensionInformation {
     this.version = version;
   }
 
-  public static fromJSON(text: string) {
-    try {
-      const obj = JSON.parse(text);
-      const meta = new ExtensionMetadata(
-        obj.meta.galleryApiUrl,
-        obj.meta.id,
-        obj.meta.downloadUrl,
-        obj.meta.publisherId,
-        obj.meta.publisherDisplayName,
-        obj.meta.date
-      );
-      const item = new ExtensionInformation(meta, obj.name, obj.publisher, obj.version);
-      return item;
-    } catch (err: any) {
-      throw new Error(err);
-    }
-  }
-
-  public static fromJSONList(text: string) {
-    const extList: ExtensionInformation[] = [];
-    try {
-      const list = JSON.parse(text);
-      list.forEach((obj: any) => {
-        const meta = new ExtensionMetadata(
-          obj.metadata.galleryApiUrl,
-          obj.metadata.id,
-          obj.metadata.downloadUrl,
-          obj.metadata.publisherId,
-          obj.metadata.publisherDisplayName,
-          obj.metadata.date
-        );
-        const item = new ExtensionInformation(meta, obj.name, obj.publisher, obj.version);
-
-        if (item.name !== "code-settings-sync") {
-          extList.push(item);
-        }
-      });
-    } catch (err: any) {
-      throw new Error(err);
-    }
-
-    return extList;
-  }
-
   public metadata: ExtensionMetadata;
   public name: string;
   public version: string;
@@ -72,7 +28,7 @@ export class ExtensionMetadata {
 
 export function CreateExtensionList() {
   return vscode.extensions.all
-    .filter(ext => !ext.packageJSON.isBuiltin)
+    .filter(ext => !ext.packageJSON.isBuiltin && ext.packageJSON.name !== "midis-drive")
     .map(ext => {
       const meta = ext.packageJSON.__metadata || {
         id: ext.packageJSON.uuid,
@@ -89,8 +45,7 @@ export function CreateExtensionList() {
       );
       const info = new ExtensionInformation(data, ext.packageJSON.name, ext.packageJSON.publisher, ext.packageJSON.version);
       return info;
-    })
-    .filter(ext => ext.name !== "midis-drive");
+    });
 }
 
 export function GetMissingExtensions(
@@ -125,10 +80,10 @@ export async function InstallExtensions(
 }
 
 export async function InstallWithAPI(
-  missingExtensions: ExtensionInformation[]
+  extensions: ExtensionInformation[]
 ): Promise<ExtensionInformation[]> {
   const addedExtensions: ExtensionInformation[] = [];
-  for (const ext of missingExtensions) {
+  for (const ext of extensions) {
     const name = ext.publisher + "." + ext.name;
     try {
       await vscode.commands.executeCommand(

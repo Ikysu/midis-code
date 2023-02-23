@@ -26,6 +26,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
 	let userInfo: vscode.StatusBarItem = vscode.window.createStatusBarItem("logout", vscode.StatusBarAlignment.Left, Infinity);
 	userInfo.text="Выйти";
+	userInfo.tooltip="Loading...";
 	context.subscriptions.push(userInfo);
 	userInfo.show();
 	userInfo.command="midis-drive.logout";
@@ -48,7 +49,9 @@ export async function activate(context: vscode.ExtensionContext) {
   		// 	"recommendations": ["beardedbear.beardedtheme", "amodio.tsl-problem-matcher", "hediet.vscode-drawio", "dbaeumer.vscode-eslint", "eamodio.gitlens", "PKief.material-icon-theme", "esbenp.prettier-vscode"]
 			// })), {create: true, overwrite: false});
 			
-			await (new Syncer(midisFs)).init();
+			await (new Syncer(midisFs)).init(
+				userInfo
+			);
 
 			context.subscriptions.push(vscode.workspace.registerFileSystemProvider('midisfs', midisFs, { isCaseSensitive: true }));
 
