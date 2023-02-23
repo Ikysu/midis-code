@@ -53,7 +53,7 @@ export class MidisFS implements vscode.FileSystemProvider {
 
 	_formatElement(data: any): Element {
 		return {
-			id: data.ID,
+			id: +data.ID,
 			name: data.NAME,
 			type: data.TYPE,
 			ctime: +new Date(data.CREATE_TIME),
@@ -82,6 +82,7 @@ export class MidisFS implements vscode.FileSystemProvider {
 	async stat(uri: vscode.Uri): Promise<vscode.FileStat> {
 		console.log(`Stat: ${uri.path}`);
 		const { type, ctime, mtime } = await this._uriToElement(uri.path);
+		console.log(`Stat: ${uri.path} EXSISTS`);
 		return {
 			type: this._formatType(type),
 			ctime,
@@ -127,14 +128,17 @@ export class MidisFS implements vscode.FileSystemProvider {
 	}
 
 	async rename(oldUri: vscode.Uri, newUri: vscode.Uri, options: { readonly overwrite: boolean; }): Promise<void> {
-		console.log(`Rename: ${oldUri.path}`);
 		if(options.overwrite) {
-			await this.delete(newUri, {recursive: true});
+			await this.delete(newUri, {recursive: true}).catch((_)=>{return;});
 		}
 
-		if(oldUri.path.split("/").slice(0,-1).join("/") === newUri.path.split("/").slice(0,-1).join("/")) {
-			const element = await this._uriToElement(oldUri.path);
-			const parent = await this._uriToElement(newUri.path.split("/").slice(0,-1).join("/"), true);
+		const oldUriEndFolder = oldUri.path.split("/").slice(0,-1).join("/"),
+					newUriEndFolder = newUri.path.split("/").slice(0,-1).join("/");
+
+		let element = await this._uriToElement(oldUri.path);
+		const	newParent = await this._uriToElement(newUriEndFolder, true);
+
+		if(oldUriEndFolder === newUriEndFolder) {
 			const newName: string = newUri.path.split("/").at(-1) ?? `${element.name} copy ${this._simpleName()}`;
 			switch(element.type){
 				case "file":
@@ -146,20 +150,95 @@ export class MidisFS implements vscode.FileSystemProvider {
 				default:
 					throw vscode.FileSystemError.FileNotFound(oldUri);
 			}
-			delete this._bigdata[element.parent].children[element.id];
-			this._bigdata[parent.parent].children[element.id]={
-				type:element.type,
-				name:element.name,
-				id:element.id
-			};
+			this._bigdata[newParent.id].children[element.id]=this._elementToChildren(element);
 		}else{
-			throw new Error('Увы, но пока что функция недоступна (moveto)');
+			const oldParent = await this._uriToElement(oldUriEndFolder, true);
+
+			switch(element.type){
+				case "file":
+					const { res: fileRes, data: fileData } = await request("/disk.file.moveto", { id:element.id, targetFolderId: newParent.id });
+					if (fileRes.ok) {
+						element = this._formatElement(fileData.result);
+					} else {
+						throw new Error(`Error file moveto : ${fileRes.status}`);
+					}
+					break;
+
+				case "folder":
+					const { res: folderRes, data: folderData } = await request("/disk.folder.moveto", { id:element.id, targetFolderId: newParent.id });
+					if (folderRes.ok) {
+						element = this._formatElement(folderData.result);
+					} else {
+						throw new Error(`Error folder moveto: ${folderRes.status}`);
+					}
+					break;
+
+				default:
+					throw vscode.FileSystemError.FileNotFound(oldUri);
+			}
+
+			delete this._bigdata[oldParent.id].children[element.id]; // just save id element.parent in oldParent
+			this._bigdata[element.id]=element;
+			this._bigdata[newParent.id].children[element.id]=this._elementToChildren(element);
 		}
 	}
 
-	copy?(source: vscode.Uri, destination: vscode.Uri, options: { readonly overwrite: boolean; }): void | Thenable<void> {
-		console.log(`Copy: ${source.path}`);
-		throw new Error('Увы, но пока что функция недоступна'); // disk.folder.copyto || disk.file.copyto
+	async copy?(source: vscode.Uri, destination: vscode.Uri, options: { readonly overwrite: boolean; }): Promise<void> {
+		console.log(`Copy: ${source.path} ${destination.path}`);
+
+		if(options.overwrite) { await this.delete(destination, {recursive: true}).catch((_)=>{return;}); }
+
+		const destAvalible = await this._uriToElement(destination.path).then(()=>{
+			return false;
+		}).catch(()=>{
+			return true;
+		});
+
+		if(destAvalible){
+			let sourceElement = await this._uriToElement(source.path);
+			const	sourceParent = await this._uriToElement(source.path.split("/").slice(0,-1).join("/")),
+						destinationParent = await this._uriToElement(destination.path.split("/").slice(0,-1).join("/"), true, false);
+			
+			switch(sourceElement.type){
+				case "file":
+					const { res: fileRes, data: fileData } = await request("/disk.file.copyto", { id:sourceElement.id, targetFolderId: destinationParent.id });
+					if (fileRes.ok) {
+						sourceElement = this._formatElement(fileData.result);
+					} else { 
+						throw new Error(`Error file copyto : ${fileRes.status}`);
+					}
+					break;
+					
+				case "folder":
+					const { res: folderRes, data: folderData } = await request("/disk.folder.copyto", { id:sourceElement.id, targetFolderId: destinationParent.id });
+					if (folderRes.ok) {
+						sourceElement = this._formatElement(folderData.result);
+					} else { 
+						throw new Error(`Error folder copyto : ${folderRes.status}`);
+					}
+					break;
+
+				default:
+					throw vscode.FileSystemError.FileNotFound(source);
+			}
+
+			console.log(sourceParent);
+			console.log(sourceElement);
+			console.log(destinationParent);
+
+			delete this._bigdata[sourceParent.id].children[sourceElement.id]; // just save id sourceElement.parent in sourceParent
+			this._bigdata[sourceElement.id]=sourceElement;
+			this._bigdata[destinationParent.id].children[sourceElement.id]=this._elementToChildren(sourceElement);
+		
+
+			console.log(sourceParent);
+			console.log(sourceElement);
+			console.log(destinationParent);
+		
+		
+		}else{
+			throw vscode.FileSystemError.FileExists(destination);
+		}
 	}
 
 	// ================================
@@ -239,9 +318,12 @@ export class MidisFS implements vscode.FileSystemProvider {
 		for(const child of await this._recursiveDelete(folder.id)) {
 			delete this._bigdata[child];
 		}
-		const { res: deleteFolderRes, data: deleteFolderData } = await request("/disk.folder.deletetree", { id });
+		const { res: deleteFolderRes, data: deleteFolderData } = await request("/disk.folder.deletetree?name="+uri.path.replace("/","--"), { id });
 		if (deleteFolderRes.ok) {
-			if(deleteFolderData.result) { delete this._bigdata[id]; }
+			if(deleteFolderData.result) {
+				delete this._bigdata[folder.parent].children[id];
+				delete this._bigdata[id];
+			}
 			return deleteFolderData.result;
 		} else {
 			throw vscode.FileSystemError.FileNotADirectory(uri);
@@ -283,8 +365,8 @@ export class MidisFS implements vscode.FileSystemProvider {
 			} else {
 				throw new Error(`Error get folder: ${folderRes.status}`);
 			}
+			this._bigdata[folder.id]=folder;
 		}
-		this._bigdata[folder.id]=folder;
 		return folder;
 	}
 
@@ -391,14 +473,13 @@ export class MidisFS implements vscode.FileSystemProvider {
 			const { res: rootFolderRes, data: rootFolderData } = await request("/disk.folder.getchildren", { id });
 			if (rootFolderRes.ok) {
 				const out = rootFolderData.result.map((e: any) => this._formatElement(e));
-				out.forEach((e: Element)=>{
+				const childs = out.map((e: Element)=>{
 					this._bigdata[e.id]=e;
-					folder.children[e.id]={
-						type:e.type,
-						name:e.name,
-						id:e.id
-					};
+					return this._elementToChildren(e);
 				});
+				for(const child of childs) {
+					folder.children[child.id]=child;
+				}
 				this._bigdata[folder.id]=folder;
 				return out;
 			} else {
@@ -408,6 +489,14 @@ export class MidisFS implements vscode.FileSystemProvider {
 	}
 
 	// ================================
+
+	_elementToChildren(element: Element) {
+		return {
+			type:element.type,
+			name:element.name,
+			id:+element.id
+		};
+	} 
 
 	_thisIsFileOrFolder(uri: vscode.Uri): "file" | "folder" {
 		return "file";
