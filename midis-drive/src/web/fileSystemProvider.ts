@@ -318,7 +318,7 @@ export class MidisFS implements vscode.FileSystemProvider {
 		for(const child of await this._recursiveDelete(folder.id)) {
 			delete this._bigdata[child];
 		}
-		const { res: deleteFolderRes, data: deleteFolderData } = await request("/disk.folder.deletetree?name="+uri.path.replace("/","--"), { id });
+		const { res: deleteFolderRes, data: deleteFolderData } = await request("/disk.folder.deletetree", { id });
 		if (deleteFolderRes.ok) {
 			if(deleteFolderData.result) {
 				delete this._bigdata[folder.parent].children[id];
