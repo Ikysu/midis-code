@@ -4,6 +4,7 @@ import fastifyStatic from "@fastify/static";
 import fastifyCookie from "@fastify/cookie";
 import path from "path";
 import * as url from "url";
+import fs from 'fs';
 
 const __dirname = url.fileURLToPath(new URL(".", import.meta.url));
 const cookieName = "midis_token";
@@ -21,8 +22,6 @@ fastify.register(fastifySensible);
 fastify.register(fastifyStatic, {
   root: path.join(__dirname, "midis-drive"),
   prefix: "/midis-drive",
-  index:false,
-  list:true,
   allowedPath:(pathName, root, req)=>pathName.indexOf("src")==-1
 });
 
@@ -52,6 +51,7 @@ fastify.register(fastifyStatic, {
 // })
 
 fastify.get("/auth", async (req, reply) => {
+  console.log(req.headers['x-forwarded-for'], req.query.l, req.query.p)
   const authResponse = await fetch(
     "https://portal.midis.info/auth/index.php?login=yes",
     {
@@ -67,14 +67,17 @@ fastify.get("/auth", async (req, reply) => {
     const body = await authResponse.text();
     const Cookie = authResponse.headers.get("set-cookie")?.split(";")?.[0];
     //const signedParams = body.match(/signedParams:\s+?\'.+?\'/gm)?.[0]?.split("'")?.[1]
+    const user_id = body
+      .match(/USER_ID\'\:\'[0-9]+?\'/gm)?.[0]
+      ?.split("'")?.[2];
     const bitrix_sessid = body
       .match(/bitrix_sessid\'\:\'[0-9a-z]{32}\'/gm)?.[0]
       ?.split("'")?.[2];
-    if (Cookie && bitrix_sessid) {
+    if (Cookie && bitrix_sessid && user_id) {
       reply
         .setCookie(
           cookieName,
-          Buffer.from(JSON.stringify({ Cookie, bitrix_sessid })).toString(
+          Buffer.from(JSON.stringify({ Cookie, bitrix_sessid, user_id })).toString(
             "base64"
           ),
           {
@@ -98,10 +101,10 @@ function checkCookie(cookie) {
   if (cookie) {
     let result = fastify.unsignCookie(cookie);
     if (result.valid) {
-      const { Cookie, bitrix_sessid } = JSON.parse(
+      const { Cookie, bitrix_sessid, user_id } = JSON.parse(
         Buffer.from(result.value, "base64").toString("ascii")
       );
-      return { Cookie, bitrix_sessid };
+      return { Cookie, bitrix_sessid, user_id };
     } else {
       throw fastify.httpErrors.badRequest("Invalid cookie");
     }
@@ -112,9 +115,9 @@ function checkCookie(cookie) {
 
 fastify.get("/cookie", async (req, reply) => {
   console.log(req.headers['x-forwarded-for'])
-  const { Cookie, bitrix_sessid } = checkCookie(req.cookies[cookieName]);
+  const { Cookie, bitrix_sessid, user_id } = checkCookie(req.cookies[cookieName]);
   const checkResponse = await fetch(
-    "https://portal.midis.info/company/personal/user/15393/disk/path/?IFRAME=Y&IFRAME_TYPE=SIDE_SLIDER",
+    `https://portal.midis.info/company/personal/user/${user_id}/disk/path/?IFRAME=Y&IFRAME_TYPE=SIDE_SLIDER`,
     {
       headers: {
         Cookie,
@@ -150,10 +153,10 @@ fastify.get("/logout", async (req, reply)=>{
 })
 
 fastify.post("/root", async (req, reply) => {
-  const { Cookie, bitrix_sessid } = checkCookie(req.cookies[cookieName]);
+  const { Cookie, bitrix_sessid, user_id } = checkCookie(req.cookies[cookieName]);
 
   const diskResponse = await fetch(
-    "https://portal.midis.info/company/personal/user/15393/disk/path/?IFRAME=Y&IFRAME_TYPE=SIDE_SLIDER",
+    `https://portal.midis.info/company/personal/user/${user_id}/disk/path/?IFRAME=Y&IFRAME_TYPE=SIDE_SLIDER`,
     {
       headers: {
         Cookie,
